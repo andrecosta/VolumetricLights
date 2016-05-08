@@ -128,18 +128,22 @@ public class VolumetricLight : MonoBehaviour
         if (!_light.gameObject.activeInHierarchy)
             return;
 
+        _material.SetVector("_CameraForward", Camera.current.transform.forward);
+
         _material.SetInt("_SampleCount", SampleCount);
         _material.SetVector("_NoiseVelocity", new Vector4(NoiseVelocity.x, NoiseVelocity.y) * NoiseScale);
         _material.SetVector("_NoiseData", new Vector4(NoiseScale, NoiseIntensity, NoiseIntensityOffset));
         _material.SetVector("_MieG", new Vector4(1 - (MieG * MieG), 1 + (MieG * MieG), 2 * MieG, 1.0f / (4.0f * Mathf.PI)));
         _material.SetVector("_VolumetricLight", new Vector4(ScatteringCoef, ExtinctionCoef, _light.range, 1.0f - SkyboxExtinctionCoef));
 
-        if (renderer.Resolution == VolumetricLightRenderer.VolumtericResolution.Full)
+        _material.SetTexture("_CameraDepthTexture", renderer.GetVolumeLightDepthBuffer());
+        
+        //if (renderer.Resolution == VolumetricLightRenderer.VolumtericResolution.Full)
         {
-            _material.SetFloat("_ZTest", (int)UnityEngine.Rendering.CompareFunction.LessEqual);
+            //_material.SetFloat("_ZTest", (int)UnityEngine.Rendering.CompareFunction.LessEqual);
             //_material.DisableKeyword("MANUAL_ZTEST");            
         }
-        else
+        //else
         {
             _material.SetFloat("_ZTest", (int)UnityEngine.Rendering.CompareFunction.Always);            
             // downsampled light buffer can't use native zbuffer for ztest, try to perform ztest in pixel shader to avoid ray marching for occulded geometry 
@@ -171,6 +175,11 @@ public class VolumetricLight : MonoBehaviour
         }
     }
 
+    void Update()
+    {
+        _commandBuffer.Clear();
+    }
+
     /// <summary>
     /// 
     /// </summary>
@@ -185,9 +194,7 @@ public class VolumetricLight : MonoBehaviour
         _material.SetPass(pass);
 
         Mesh mesh = VolumetricLightRenderer.GetPointLightMesh();
-
-        _commandBuffer.Clear();
-
+        
         float scale = _light.range * 2.0f;
         Matrix4x4 world = Matrix4x4.TRS(transform.position, _light.transform.rotation, new Vector3(scale, scale, scale));
 
@@ -226,11 +233,7 @@ public class VolumetricLight : MonoBehaviour
         {
             _material.EnableKeyword("SHADOWS_CUBE");
             _commandBuffer.SetGlobalTexture("_ShadowMapTexture", BuiltinRenderTextureType.CurrentActive);
-
-            if (renderer.Resolution == VolumetricLightRenderer.VolumtericResolution.Full)
-                _commandBuffer.SetRenderTarget(renderer.GetVolumeLightBuffer(), BuiltinRenderTextureType.CameraTarget);            
-            else
-                _commandBuffer.SetRenderTarget(renderer.GetVolumeLightBuffer());
+            _commandBuffer.SetRenderTarget(renderer.GetVolumeLightBuffer());
 
             _commandBuffer.DrawMesh(mesh, world, _material, 0, pass);
 
@@ -261,9 +264,7 @@ public class VolumetricLight : MonoBehaviour
         }
 
         Mesh mesh = VolumetricLightRenderer.GetSpotLightMesh();
-
-        _commandBuffer.Clear();
-        
+                
         float scale = _light.range;
         float angleScale = Mathf.Tan((_light.spotAngle + 1) * 0.5f * Mathf.Deg2Rad) * _light.range;
 
@@ -332,12 +333,7 @@ public class VolumetricLight : MonoBehaviour
 
             _material.EnableKeyword("SHADOWS_DEPTH");
             _commandBuffer.SetGlobalTexture("_ShadowMapTexture", BuiltinRenderTextureType.CurrentActive);
-
-            if(renderer.Resolution == VolumetricLightRenderer.VolumtericResolution.Full)
-                _commandBuffer.SetRenderTarget(renderer.GetVolumeLightBuffer(), BuiltinRenderTextureType.CameraTarget);            
-            else
-                _commandBuffer.SetRenderTarget(renderer.GetVolumeLightBuffer());
-
+            _commandBuffer.SetRenderTarget(renderer.GetVolumeLightBuffer());
 
             _commandBuffer.DrawMesh(mesh, world, _material, 0, pass);
 
@@ -366,9 +362,7 @@ public class VolumetricLight : MonoBehaviour
         _material.SetPass(pass);
 
         Mesh mesh = VolumetricLightRenderer.GetDirLightMesh();
-
-        _commandBuffer.Clear();
-
+        
         float zScale = Mathf.Min(Camera.current.farClipPlane, MaxRayLength);
         float yScale = Camera.current.farClipPlane * Mathf.Tan(Mathf.Deg2Rad * Camera.current.fieldOfView * 0.5f);
         float xScale = yScale * Camera.current.aspect;
@@ -403,10 +397,7 @@ public class VolumetricLight : MonoBehaviour
         {
             _material.EnableKeyword("SHADOWS_DEPTH");
             //_commandBuffer.SetGlobalTexture("_ShadowMapTexture", BuiltinRenderTextureType.CurrentActive);
-            if (renderer.Resolution == VolumetricLightRenderer.VolumtericResolution.Full)
-                _commandBuffer.SetRenderTarget(renderer.GetVolumeLightBuffer(), BuiltinRenderTextureType.CameraTarget);
-            else
-                _commandBuffer.SetRenderTarget(renderer.GetVolumeLightBuffer());
+            _commandBuffer.SetRenderTarget(renderer.GetVolumeLightBuffer());
             //_commandBuffer.Blit(texture, VolumetricLightRenderer.GetVolumeLightBuffer(), _material, pass);
             _commandBuffer.DrawMesh(mesh, world, _material, 0, pass);
 
